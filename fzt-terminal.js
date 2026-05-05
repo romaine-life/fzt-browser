@@ -452,6 +452,12 @@ export function createFztTerminal(container, options = {}) {
       if (result && !(result instanceof Error)) render(result);
     },
 
+    enterPromptMode(mode, action, icon = "", placeholder = "") {
+      if (!ready || !sessionActive) return;
+      const result = fzt.enterPromptMode(mode, action, icon, placeholder);
+      if (result && !(result instanceof Error)) render(result);
+    },
+
     setIdentity(identity) {
       if (!ready) return;
       fzt.setIdentity(identity);

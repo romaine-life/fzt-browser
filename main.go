@@ -7,9 +7,9 @@ import (
 	"syscall/js"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/nelsong6/fzt-terminal/tui"
 	"github.com/nelsong6/fzt/core"
 	"github.com/nelsong6/fzt/render"
-	"github.com/nelsong6/fzt-terminal/tui"
 )
 
 // Lifecycle: JS must call loadYAML, then optionally setFrontend/addCommands/
@@ -27,21 +27,22 @@ var (
 
 func main() {
 	js.Global().Set("fzt", js.ValueOf(map[string]interface{}{
-		"init":        js.FuncOf(initSession),
-		"handleKey":   js.FuncOf(handleKey),
-		"clickRow":    js.FuncOf(clickRow),
-		"resize":      js.FuncOf(resize),
-		"loadYAML":    js.FuncOf(loadYAML),
-		"setLabel":    js.FuncOf(setLabel),
-		"setIdentity": js.FuncOf(setIdentity),
-		"addCommands": js.FuncOf(addCommands),
-		"setFrontend":    js.FuncOf(setFrontend),
-		"hidePalette":    js.FuncOf(hidePalette),
-		"setStatus":      js.FuncOf(setStatus),
-		"clearStatus":    js.FuncOf(clearStatus),
-		"getVisibleRows": js.FuncOf(getVisibleRows),
-		"getPromptState": js.FuncOf(getPromptState),
-		"getUIState":     js.FuncOf(getUIState),
+		"init":            js.FuncOf(initSession),
+		"handleKey":       js.FuncOf(handleKey),
+		"clickRow":        js.FuncOf(clickRow),
+		"resize":          js.FuncOf(resize),
+		"loadYAML":        js.FuncOf(loadYAML),
+		"setLabel":        js.FuncOf(setLabel),
+		"setIdentity":     js.FuncOf(setIdentity),
+		"addCommands":     js.FuncOf(addCommands),
+		"setFrontend":     js.FuncOf(setFrontend),
+		"hidePalette":     js.FuncOf(hidePalette),
+		"setStatus":       js.FuncOf(setStatus),
+		"clearStatus":     js.FuncOf(clearStatus),
+		"enterPromptMode": js.FuncOf(enterPromptMode),
+		"getVisibleRows":  js.FuncOf(getVisibleRows),
+		"getPromptState":  js.FuncOf(getPromptState),
+		"getUIState":      js.FuncOf(getUIState),
 	}))
 	select {}
 }
@@ -158,6 +159,30 @@ func clearStatus(this js.Value, args []js.Value) interface{} {
 		return js.Null()
 	}
 	session.State().ClearTitle()
+	return frameToJS(session.Render())
+}
+
+func enterPromptMode(this js.Value, args []js.Value) interface{} {
+	if session == nil {
+		return js.Null()
+	}
+	if len(args) < 2 {
+		return jsError("enterPromptMode requires (mode, action[, icon, placeholder])")
+	}
+	mode := args[0].String()
+	action := args[1].String()
+	var icon rune
+	if len(args) >= 3 && args[2].Type() == js.TypeString {
+		runes := []rune(args[2].String())
+		if len(runes) > 0 {
+			icon = runes[0]
+		}
+	}
+	placeholder := ""
+	if len(args) >= 4 && args[3].Type() == js.TypeString {
+		placeholder = args[3].String()
+	}
+	session.State().EnterPromptMode(mode, action, icon, placeholder)
 	return frameToJS(session.Render())
 }
 
@@ -392,6 +417,7 @@ func getPromptState(this js.Value, args []js.Value) interface{} {
 	ps := session.GetPromptState()
 	obj := js.Global().Get("Object").New()
 	obj.Set("mode", ps.Mode)
+	obj.Set("icon", ps.Icon)
 	scopeArr := js.Global().Get("Array").New(len(ps.ScopePath))
 	for i, s := range ps.ScopePath {
 		scopeArr.SetIndex(i, s)
