@@ -61,7 +61,7 @@ function createPromptBar(prompt) {
   // Mode icon
   const icon = document.createElement('span');
   icon.className = prompt.mode === 'nav' ? 'fzt-prompt-icon fzt-nav' : 'fzt-prompt-icon fzt-search';
-  icon.textContent = prompt.mode === 'nav' ? '\uF0A9' : '\uF002';
+  icon.textContent = prompt.icon || (prompt.mode === 'nav' ? '\uF0A9' : '\uF002');
   bar.appendChild(icon);
 
   // Scope breadcrumbs

@@ -4,8 +4,8 @@ go 1.26.1
 
 require (
 	github.com/gdamore/tcell/v2 v2.13.9
-	github.com/nelsong6/fzt v0.2.71
-	github.com/nelsong6/fzt-terminal v0.1.94
+	github.com/nelsong6/fzt v0.2.72
+	github.com/nelsong6/fzt-terminal v0.1.96
 )
 
 require (
