@@ -30,15 +30,15 @@ The Go code exposes a global `fzt` object:
 
 ## Dependencies
 
-- `github.com/nelsong6/fzt` — engine (state, scoring, tree logic, YAML parsing, render abstractions)
-- `github.com/nelsong6/fzt-terminal` — headless session + palette injection via tui (which in turn pulls in fzt-frontend)
+- `github.com/romaine-life/fzt` — engine (state, scoring, tree logic, YAML parsing, render abstractions)
+- `github.com/romaine-life/fzt-terminal` — headless session + palette injection via tui (which in turn pulls in fzt-frontend)
 - `github.com/gdamore/tcell/v2` — terminal screen library (used by the headless session)
 
 ## CI
 
 Three workflows, all manually triggered (Claude-driven):
 
-- **`.github/workflows/dispatch.yml`** (`workflow_dispatch`) — dependency bump path. Calls `go-dependency-update-template`: bumps `github.com/nelsong6/fzt` + `github.com/nelsong6/fzt-terminal` in go.mod, commits, pushes, then delegates to `release-and-dispatch-template` to cut the release.
+- **`.github/workflows/dispatch.yml`** (`workflow_dispatch`) — dependency bump path. Calls `go-dependency-update-template`: bumps `github.com/romaine-life/fzt` + `github.com/romaine-life/fzt-terminal` in go.mod, commits, pushes, then delegates to `release-and-dispatch-template` to cut the release.
 - **`.github/workflows/release.yml`** (`workflow_dispatch`) — direct-push release path for code changes. Calls `release-and-dispatch-template` directly. Shared `release-tag` concurrency group with `dispatch.yml`.
 - **`.github/workflows/build.yml`** (fires on `workflow_dispatch` from the release template with the new tag as input) — compiles `fzt.wasm` via `GOOS=js GOARCH=wasm` (injecting `render.Version` and `frontend.EngineVersion` via ldflags), packages the four JS/CSS files, and `gh release upload`s them to the already-created release. Tag is passed by value so no sha-drift race.
 
@@ -46,4 +46,4 @@ Downstream consumers (`fzt-showcase`, `my-homepage`) download the release assets
 
 ## History
 
-Extracted from `nelsong6/fzt-terminal` on 2026-04-16 as part of the fzt repo split. Was `fzt-terminal/web/` + `fzt-terminal/cmd/wasm/`. The grammar goal: each fzt repo names exactly one thing.
+Extracted from `romaine-life/fzt-terminal` on 2026-04-16 as part of the fzt repo split. Was `fzt-terminal/web/` + `fzt-terminal/cmd/wasm/`. The grammar goal: each fzt repo names exactly one thing.
