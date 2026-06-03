@@ -7,9 +7,9 @@ import (
 	"syscall/js"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/nelsong6/fzt-terminal/tui"
-	"github.com/nelsong6/fzt/core"
-	"github.com/nelsong6/fzt/render"
+	"github.com/romaine-life/fzt-terminal/tui"
+	"github.com/romaine-life/fzt/core"
+	"github.com/romaine-life/fzt/render"
 )
 
 // Lifecycle: JS must call loadYAML, then optionally setFrontend/addCommands/
