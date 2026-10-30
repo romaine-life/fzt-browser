@@ -7,9 +7,11 @@ name: Build
 #
 # Release creation and downstream dispatch (to my-homepage, fzt-showcase) are
 # handled by the template in dispatch.yml. This workflow does NOT cut tags
-# and does NOT dispatch.
+# and does NOT dispatch. Every pull request runs the same build without the
+# upload, so a release is never the first build of a change.
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       tag:
@@ -36,6 +38,12 @@ jobs:
         id: engine
         run: echo "version=$(grep 'github.com/romaine-life/fzt ' go.mod | awk '{print $2}')" >> $GITHUB_OUTPUT
 
+      - name: Vet
+        run: go vet .
+        env:
+          GOOS: js
+          GOARCH: wasm
+
       - name: Build WASM
         run: >
           go build
@@ -48,6 +56,7 @@ jobs:
           CGO_ENABLED: "0"
 
       - name: Upload assets to release
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
