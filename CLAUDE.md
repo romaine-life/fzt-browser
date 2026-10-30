@@ -36,11 +36,11 @@ The Go code exposes a global `fzt` object:
 
 ## CI
 
-Three workflows, all manually triggered (Claude-driven):
+Three workflows (Claude-driven). `main` has the ruleset "main: require PR + green CI" (PR, squash only, required checks), so every change, the bot's dependency bumps included, lands through a pull request.
 
-- **`.github/workflows/dispatch.yml`** (`workflow_dispatch`) — dependency bump path. Calls `go-dependency-update-template`: bumps `github.com/romaine-life/fzt` + `github.com/romaine-life/fzt-terminal` in go.mod, commits, pushes, then delegates to `release-and-dispatch-template` to cut the release.
+- **`.github/workflows/dispatch.yml`** (`workflow_dispatch`) — dependency bump path. Calls `go-dependency-update-template`: bumps `github.com/romaine-life/fzt` + `github.com/romaine-life/fzt-terminal` in go.mod on a `deps/<run id>` branch, opens a PR, merges it once its checks pass, then delegates to `release-and-dispatch-template` to cut the release.
 - **`.github/workflows/release.yml`** (`workflow_dispatch`) — direct-push release path for code changes. Calls `release-and-dispatch-template` directly. Shared `release-tag` concurrency group with `dispatch.yml`.
-- **`.github/workflows/build.yml`** (fires on `workflow_dispatch` from the release template with the new tag as input) — compiles `fzt.wasm` via `GOOS=js GOARCH=wasm` (injecting `render.Version` and `frontend.EngineVersion` via ldflags), packages the four JS/CSS files, and `gh release upload`s them to the already-created release. Tag is passed by value so no sha-drift race.
+- **`.github/workflows/build.yml`** (runs on every pull request as the required `build` check, without the upload; and on `workflow_dispatch` from the release template with the new tag as input) — compiles `fzt.wasm` via `GOOS=js GOARCH=wasm` (injecting `render.Version` and `frontend.EngineVersion` via ldflags), packages the four JS/CSS files, and `gh release upload`s them to the already-created release. Tag is passed by value so no sha-drift race.
 
 Downstream consumers (`fzt-showcase`, `my-homepage`) download the release assets at deploy time and are updated manually — no `repository_dispatch` fan-out. Template lives at `nelsong6/pipeline-templates`.
 
