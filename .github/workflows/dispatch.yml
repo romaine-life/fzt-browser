@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   update:
-    uses: romaine-life/pipeline-templates/.github/workflows/go-dependency-update-template.yml@op-2098-deps-via-pr
+    uses: romaine-life/pipeline-templates/.github/workflows/go-dependency-update-template.yml@main
     with:
       modules: github.com/romaine-life/fzt github.com/romaine-life/fzt-terminal
       # Template bumps go.mod, cuts the release at the pushed sha, then
