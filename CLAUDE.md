@@ -36,13 +36,32 @@ The Go code exposes a global `fzt` object:
 
 ## CI
 
-Three workflows (Claude-driven). `main` has the ruleset "main: require PR + green CI" (PR, squash only, required checks), so every change, the bot's dependency bumps included, lands through a pull request.
+Forgejo is the home for checks, dependency updates and releases. Go module paths
+remain `github.com/romaine-life/...`; each job reads their source from Forgejo with
+a job-scoped Git URL rewrite and `PIPELINE_DISPATCH_TOKEN`.
 
-- **`.github/workflows/dispatch.yml`** (`workflow_dispatch`) — dependency bump path. Calls `go-dependency-update-template`: bumps `github.com/romaine-life/fzt` + `github.com/romaine-life/fzt-terminal` in go.mod on a `deps/<run id>` branch, opens a PR, merges it once its checks pass, then delegates to `release-and-dispatch-template` to cut the release.
-- **`.github/workflows/release.yml`** (`workflow_dispatch`) — direct-push release path for code changes. Calls `release-and-dispatch-template` directly. Shared `release-tag` concurrency group with `dispatch.yml`.
-- **`.github/workflows/build.yml`** (runs on every pull request as the required `build` check, without the upload; and on `workflow_dispatch` from the release template with the new tag as input) — compiles `fzt.wasm` via `GOOS=js GOARCH=wasm` (injecting `render.Version` and `frontend.EngineVersion` via ldflags), packages the four JS/CSS files, and `gh release upload`s them to the already-created release. Tag is passed by value so no sha-drift race.
+- **`.forgejo/workflows/build.yml`** runs on every pull request and main push. It
+  vets and builds WASM with the pinned engine version and checks that the five
+  release assets are present. A manual run with a `tag` input can resume uploading
+  an incomplete release; existing assets must match the build byte for byte.
+- **`.forgejo/workflows/release.yml`** is manual. It builds first, reserves the next
+  `v0.1.N` tag at the checked-out commit, stages all five assets on a draft release,
+  and publishes only when they are present. Re-running an already complete HEAD
+  release does nothing. It runs inline because Forgejo's reusable workflow lookup
+  cannot resolve the private organization reliably.
+- **`.forgejo/workflows/dispatch.yml`** is the manual dependency update. It bumps
+  `fzt` and `fzt-terminal`, opens a PR, waits for CI on the exact head and squash
+  merges it before dispatching Release. It never pushes directly to main.
 
-Downstream consumers (`fzt-showcase`, `my-homepage`) download the release assets at deploy time and are updated manually — no `repository_dispatch` fan-out. Template lives at `nelsong6/pipeline-templates`.
+Run a workflow with an authenticated POST to
+`https://forgejo.romaine.life/api/v1/repos/romaine-life/fzt-browser/actions/workflows/release.yml/dispatches`
+(or `dispatch.yml` for a dependency update), with JSON body `{"ref":"main"}`.
+The release assets remain `fzt.wasm`, `fzt-terminal.js`, `fzt-terminal.css`,
+`fzt-web.js`, and `fzt-dom-renderer.js`.
+
+Downstream consumers (`fzt-showcase`, `my-homepage`) download the release assets at
+deploy time and are updated manually; there is no dispatch fan-out. The GitHub
+workflows remain enabled during migration until Forgejo's main CI and release pass.
 
 ## History
 

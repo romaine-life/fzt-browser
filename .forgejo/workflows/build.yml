@@ -1,0 +1,96 @@
+name: Build
+
+# Every PR and main commit builds the same five assets as a release.
+# A manual tag build resumes an incomplete release; it never replaces assets.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GOPRIVATE: github.com/romaine-life/*
+      GOSUMDB: 'off'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Read organization modules from Forgejo
+        env:
+          TOKEN: ${{ secrets.PIPELINE_DISPATCH_TOKEN }}
+        run: |
+          if (-not $env:TOKEN) { throw 'PIPELINE_DISPATCH_TOKEN is not set' }
+          $auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("x-access-token:$env:TOKEN"))
+          Write-Host "::add-mask::$auth"
+          'GIT_CONFIG_COUNT=2',
+          'GIT_CONFIG_KEY_0=url.https://forgejo.romaine.life/romaine-life/.insteadOf',
+          'GIT_CONFIG_VALUE_0=https://github.com/romaine-life/',
+          'GIT_CONFIG_KEY_1=http.https://forgejo.romaine.life/.extraheader',
+          "GIT_CONFIG_VALUE_1=Authorization: Basic $auth" | Add-Content $env:GITHUB_ENV
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Vet and build WASM
+        env:
+          GOOS: js
+          GOARCH: wasm
+          CGO_ENABLED: '0'
+          TAG: ${{ inputs.tag }}
+        run: |
+          $engine = go list -m -f '{{.Version}}' github.com/romaine-life/fzt
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $version = if ($env:TAG) { $env:TAG } else { $env:GITHUB_SHA }
+          go vet .
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          go build -trimpath -ldflags "-X github.com/romaine-life/fzt/render.Version=$version -X github.com/romaine-life/fzt-frontend.EngineVersion=$engine" -o fzt.wasm .
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js') {
+            if ((Get-Item $file).Length -eq 0) { throw "Empty release asset: $file" }
+          }
+
+      - name: Upload missing assets to existing release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          $api = "$env:GITHUB_SERVER_URL/api/v1/repos/$env:GITHUB_REPOSITORY"
+          $h = @{Authorization="token $env:TOKEN"}
+          $sha = git rev-parse HEAD
+          $tag = Invoke-RestMethod "$api/tags/$env:TAG" -Headers $h
+          if ($tag.commit.sha -ne $sha) { throw 'Release tag points to another commit' }
+          $release = Invoke-RestMethod "$api/releases/tags/$env:TAG" -Headers $h
+          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js') {
+            $existing = $release.assets | Where-Object name -eq $file
+            if ($existing) {
+              $saved = Join-Path $env:RUNNER_TEMP ([Guid]::NewGuid().ToString())
+              try {
+                Invoke-WebRequest $existing.browser_download_url -Headers $h -OutFile $saved
+                if ((Get-FileHash $saved).Hash -ne (Get-FileHash $file).Hash) { throw "Existing asset differs: $file" }
+              } finally { Remove-Item $saved -ErrorAction SilentlyContinue }
+            } else {
+              Invoke-RestMethod -Method Post "$api/releases/$($release.id)/assets?name=$file" -Headers $h -Form @{attachment=Get-Item $file} | Out-Null
+            }
+          }
+          if ($release.draft) {
+            Invoke-RestMethod -Method Patch "$api/releases/$($release.id)" -Headers $h -ContentType application/json -Body '{"draft":false}' | Out-Null
+          }
+          Write-Host "Published all five assets for $env:TAG at $sha"

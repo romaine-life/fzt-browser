@@ -1,0 +1,108 @@
+name: Dependency Update
+
+# Manual update: POST /api/v1/repos/romaine-life/fzt-browser/actions/workflows/dispatch.yml/dispatches
+# with {"ref":"main"}. Dependency changes go through a checked PR; releases stay manual.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dependency-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GOPRIVATE: github.com/romaine-life/*
+      GOSUMDB: 'off'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Read organization modules and push updates through Forgejo
+        env:
+          TOKEN: ${{ secrets.PIPELINE_DISPATCH_TOKEN }}
+        run: |
+          if (-not $env:TOKEN) { throw 'PIPELINE_DISPATCH_TOKEN is not set' }
+          $auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("x-access-token:$env:TOKEN"))
+          Write-Host "::add-mask::$auth"
+          'GIT_CONFIG_COUNT=2',
+          'GIT_CONFIG_KEY_0=url.https://forgejo.romaine.life/romaine-life/.insteadOf',
+          'GIT_CONFIG_VALUE_0=https://github.com/romaine-life/',
+          'GIT_CONFIG_KEY_1=http.https://forgejo.romaine.life/.extraheader',
+          "GIT_CONFIG_VALUE_1=Authorization: Basic $auth" | Add-Content $env:GITHUB_ENV
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Update dependencies
+        id: update
+        run: |
+          go get github.com/romaine-life/fzt@latest github.com/romaine-life/fzt-terminal@latest
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          go mod tidy
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          git diff --quiet -- go.mod go.sum
+          if ($LASTEXITCODE -eq 0) {
+            'changed=false' | Add-Content $env:GITHUB_OUTPUT
+            Write-Host 'Dependencies are already current'
+          } elseif ($LASTEXITCODE -eq 1) {
+            'changed=true' | Add-Content $env:GITHUB_OUTPUT
+          } else { exit $LASTEXITCODE }
+          exit 0
+
+      - name: Merge dependency update through a checked PR
+        if: steps.update.outputs.changed == 'true'
+        env:
+          TOKEN: ${{ secrets.PIPELINE_DISPATCH_TOKEN }}
+        run: |
+          $api = "$env:GITHUB_SERVER_URL/api/v1/repos/$env:GITHUB_REPOSITORY"
+          $h = @{Authorization="token $env:TOKEN"}
+          $branch = "deps/$env:GITHUB_RUN_ID"
+          git switch -c $branch
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          git config user.name forgejo-actions
+          git config user.email forgejo-actions@noreply.romaine.life
+          git add go.mod go.sum
+          git commit -m 'deps: update fzt and fzt-terminal'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $sha = git rev-parse HEAD
+          git push origin "HEAD:refs/heads/$branch"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $body = @{base='main';head=$branch;title='deps: update fzt and fzt-terminal';body='Automated dependency update. https://openproject.romaine.life/wp/FORGEJO-3'} | ConvertTo-Json
+          $pr = Invoke-RestMethod -Method Post "$api/pulls" -Headers $h -ContentType application/json -Body $body
+          Write-Host "Opened $($pr.html_url); waiting for checks on $sha"
+          $passed = $false
+          for ($i=0; $i -lt 180; $i++) {
+            $checks = Invoke-RestMethod "$api/commits/$sha/status" -Headers $h
+            if ($checks.total_count -gt 0 -and $checks.state -eq 'success') { $passed=$true; break }
+            if ($checks.state -in 'failure','error') { throw "Checks failed on $($pr.html_url)" }
+            Start-Sleep -Seconds 10
+          }
+          if (-not $passed) { throw "Checks timed out on $($pr.html_url)" }
+          $current = Invoke-RestMethod "$api/pulls/$($pr.number)" -Headers $h
+          if ($current.head.sha -ne $sha) { throw 'Dependency PR head changed during validation' }
+          $merge = @{Do='squash';head_commit_id=$sha;delete_branch_after_merge=$true} | ConvertTo-Json
+          Invoke-RestMethod -Method Post "$api/pulls/$($pr.number)/merge" -Headers $h -ContentType application/json -Body $merge | Out-Null
+          Write-Host "Merged $($pr.html_url)"
+
+      - name: Dispatch release after a merged update
+        if: steps.update.outputs.changed == 'true'
+        env:
+          TOKEN: ${{ secrets.PIPELINE_DISPATCH_TOKEN }}
+        run: |
+          $api = "$env:GITHUB_SERVER_URL/api/v1/repos/$env:GITHUB_REPOSITORY"
+          Invoke-RestMethod -Method Post "$api/actions/workflows/release.yml/dispatches" -Headers @{Authorization="token $env:TOKEN"} -ContentType application/json -Body '{"ref":"main"}' | Out-Null
+          Write-Host 'Dispatched Release on main; check its run for publication status'
