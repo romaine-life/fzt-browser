@@ -31,6 +31,7 @@ jobs:
           ref: ${{ inputs.tag }}
           persist-credentials: false
 
+
       - name: Read organization modules from Forgejo
         env:
           TOKEN: ${{ secrets.PIPELINE_DISPATCH_TOKEN }}
@@ -40,7 +41,7 @@ jobs:
           Write-Host "::add-mask::$auth"
           'GIT_CONFIG_COUNT=2',
           'GIT_CONFIG_KEY_0=url.https://forgejo.romaine.life/romaine-life/.insteadOf',
-          'GIT_CONFIG_VALUE_0=https://github.com/romaine-life/',
+          'GIT_CONFIG_VALUE_0=https://github.com/romaine-life/', # internet: Git rewrite source, not a fetch
           'GIT_CONFIG_KEY_1=http.https://forgejo.romaine.life/.extraheader',
           "GIT_CONFIG_VALUE_1=Authorization: Basic $auth" | Add-Content $env:GITHUB_ENV
 
@@ -94,3 +95,10 @@ jobs:
             Invoke-RestMethod -Method Patch "$api/releases/$($release.id)" -Headers $h -ContentType application/json -Body '{"draft":false}' | Out-Null
           }
           Write-Host "Published all five assets for $env:TAG at $sha"
+
+  # The fetch check reads only the repo, and runs where Python is (FORGEJO-28).
+  fetches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: romaine-life/pipeline-templates/actions/check-fetches@main

@@ -37,7 +37,7 @@ jobs:
           Write-Host "::add-mask::$auth"
           'GIT_CONFIG_COUNT=2',
           'GIT_CONFIG_KEY_0=url.https://forgejo.romaine.life/romaine-life/.insteadOf',
-          'GIT_CONFIG_VALUE_0=https://github.com/romaine-life/',
+          'GIT_CONFIG_VALUE_0=https://github.com/romaine-life/', # internet: Git rewrite source, not a fetch
           'GIT_CONFIG_KEY_1=http.https://forgejo.romaine.life/.extraheader',
           "GIT_CONFIG_VALUE_1=Authorization: Basic $auth" | Add-Content $env:GITHUB_ENV
 
