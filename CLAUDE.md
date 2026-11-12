@@ -49,13 +49,15 @@ a job-scoped Git URL rewrite and `PIPELINE_DISPATCH_TOKEN`.
   and publishes only when they are present. Re-running an already complete HEAD
   release does nothing. It runs inline because Forgejo's reusable workflow lookup
   cannot resolve the private organization reliably.
-- **`.forgejo/workflows/dispatch.yml`** is the manual dependency update. It bumps
-  `fzt` and `fzt-terminal`, opens a PR, waits for CI on the exact head and squash
-  merges it before dispatching Release. It never pushes directly to main.
+- **`.forgejo/workflows/dispatch.yml`** is the dependency take-up, through
+  pipeline-templates' take-up template. strip-owner starts it when it delivers a
+  change to `fzt` or `fzt-terminal`: it opens a PR taking them at their latest and
+  has Forgejo merge it once CI passes, and strip-owner starts Release once it has
+  (PIPT-3). It never pushes directly to main.
 
 Run a workflow with an authenticated POST to
 `https://forgejo.romaine.life/api/v1/repos/romaine-life/fzt-browser/actions/workflows/release.yml/dispatches`
-(or `dispatch.yml` for a dependency update), with JSON body `{"ref":"main"}`.
+with JSON body `{"ref":"main"}`.
 The release assets remain `fzt.wasm`, `fzt-terminal.js`, `fzt-terminal.css`,
 `fzt-web.js`, and `fzt-dom-renderer.js`.
 
