@@ -40,10 +40,12 @@ Forgejo is the home for checks, dependency updates and releases. Go module paths
 remain `github.com/romaine-life/...`; each job reads their source from Forgejo with
 a job-scoped Git URL rewrite and `PIPELINE_DISPATCH_TOKEN`.
 
-- **`.forgejo/workflows/build.yml`** runs on every pull request and main push. It
-  vets and builds WASM with the pinned engine version and checks that the five
-  release assets are present. A manual run with a `tag` input can resume uploading
-  an incomplete release; existing assets must match the build byte for byte.
+- **`.forgejo/workflows/ci.yml`** runs on every pull request and main push. Its
+  `changes` job checks CI fetches and skips the build on a pull request that
+  changes only documentation; `build` vets and builds WASM with the pinned engine
+  version and checks that the five release assets are present. A manual run with a
+  `tag` input can resume uploading an incomplete release; existing assets must match
+  the build byte for byte.
 - **`.forgejo/workflows/release.yml`** is manual. It builds first, reserves the next
   `v0.1.N` tag at the checked-out commit, stages all five assets on a draft release,
   and publishes only when they are present. Re-running an already complete HEAD

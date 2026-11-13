@@ -1,7 +1,9 @@
-name: Build
+name: CI
 
-# Every PR and main commit builds the same five assets as a release.
-# A manual tag build resumes an incomplete release; it never replaces assets.
+# Every PR and main commit builds the same five assets as a release; a PR that
+# changes only documentation skips the build. A manual run with a tag resumes an
+# incomplete release and never replaces assets; a manual run without one builds
+# the dispatched ref.
 on:
   pull_request:
   push:
@@ -9,15 +11,44 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to build
-        required: true
+        description: Existing release tag to resume (empty builds the dispatched ref)
+        required: false
         type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: romaine-life/pipeline-templates/actions/check-fetches@main
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo code=true >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "$BASE...HEAD")
+          if grep -qvE '\.md$|^docs/|^LICENSE$' <<< "$files"; then
+            echo code=true >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     defaults:
       run:
@@ -68,7 +99,7 @@ jobs:
           }
 
       - name: Upload missing assets to existing release
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
@@ -96,12 +127,5 @@ jobs:
           }
           Write-Host "Published all five assets for $env:TAG at $sha"
       - name: Delete the files of older releases
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
         uses: romaine-life/pipeline-templates/actions/prune-releases@main
-
-  # The fetch check reads only the repo, and runs where Python is (FORGEJO-28).
-  fetches:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: romaine-life/pipeline-templates/actions/check-fetches@main
