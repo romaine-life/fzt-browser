@@ -119,3 +119,6 @@ jobs:
           $expected = 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js'
           if ($published.draft -or $tag.commit.sha -ne $env:SHA -or @($expected | Where-Object { $_ -notin $published.assets.name }).Count) { throw 'Release verification failed' }
           Write-Host "$($published.html_url) at $env:SHA with all five assets"
+      - name: Delete the files of older releases
+        if: steps.version.outputs.skip != 'true'
+        uses: romaine-life/pipeline-templates/actions/prune-releases@main

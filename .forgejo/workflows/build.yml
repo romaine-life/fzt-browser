@@ -95,6 +95,9 @@ jobs:
             Invoke-RestMethod -Method Patch "$api/releases/$($release.id)" -Headers $h -ContentType application/json -Body '{"draft":false}' | Out-Null
           }
           Write-Host "Published all five assets for $env:TAG at $sha"
+      - name: Delete the files of older releases
+        if: github.event_name == 'workflow_dispatch'
+        uses: romaine-life/pipeline-templates/actions/prune-releases@main
 
   # The fetch check reads only the repo, and runs where Python is (FORGEJO-28).
   fetches:
