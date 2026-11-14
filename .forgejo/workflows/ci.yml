@@ -62,6 +62,15 @@ jobs:
           ref: ${{ inputs.tag }}
           persist-credentials: false
 
+      # A build that isn't resuming a release is named after the number release.yml
+      # would give it; only release.yml releases.
+      - name: Number the build
+        id: version
+        if: inputs.tag == ''
+        uses: romaine-life/pipeline-templates/actions/release-version@main
+        with:
+          prefix: v0.1
+          publish: 'false'
 
       - name: Read organization modules from Forgejo
         env:
@@ -85,14 +94,13 @@ jobs:
           GOOS: js
           GOARCH: wasm
           CGO_ENABLED: '0'
-          TAG: ${{ inputs.tag }}
+          VERSION: ${{ inputs.tag || steps.version.outputs.version }}
         run: |
           $engine = go list -m -f '{{.Version}}' github.com/romaine-life/fzt
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          $version = if ($env:TAG) { $env:TAG } else { $env:GITHUB_SHA }
           go vet .
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          go build -trimpath -ldflags "-X github.com/romaine-life/fzt/render.Version=$version -X github.com/romaine-life/fzt-frontend.EngineVersion=$engine" -o fzt.wasm .
+          go build -trimpath -ldflags "-X github.com/romaine-life/fzt/render.Version=$env:VERSION -X github.com/romaine-life/fzt-frontend.EngineVersion=$engine" -o fzt.wasm .
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js') {
             if ((Get-Item $file).Length -eq 0) { throw "Empty release asset: $file" }

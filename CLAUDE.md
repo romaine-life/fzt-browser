@@ -41,14 +41,17 @@ remain `github.com/romaine-life/...`; each job reads their source from Forgejo w
 a job-scoped Git URL rewrite and `PIPELINE_DISPATCH_TOKEN`.
 
 - **`.forgejo/workflows/ci.yml`** runs on every pull request and main push. Its
-  `changes` job checks CI fetches and skips the build on a pull request that
-  changes only documentation; `build` vets and builds WASM with the pinned engine
-  version and checks that the five release assets are present. A manual run with a
+  `changes` job checks CI fetches and skips the build on a pull request that changes
+  only documentation; `build` vets and builds WASM with the pinned engine version,
+  stamped with the number release.yml would give it (`v0.1.N-prP.R`,
+  from pipeline-templates' `release-version`), and checks that the five release
+  assets are present. A manual run with a
   `tag` input can resume uploading an incomplete release; existing assets must match
   the build byte for byte.
-- **`.forgejo/workflows/release.yml`** is manual. It builds first, reserves the next
-  `v0.1.N` tag at the checked-out commit, stages all five assets on a draft release,
-  and publishes only when they are present. Re-running an already complete HEAD
+- **`.forgejo/workflows/release.yml`** is manual. pipeline-templates' `release-version`
+  reserves the next `v0.1.N` tag at the checked-out commit (one it already has is
+  kept), then it builds, stages all five assets on a draft release, and publishes
+  only when they are present. Re-running an already complete HEAD
   release does nothing. It runs inline because Forgejo's reusable workflow lookup
   cannot resolve the private organization reliably.
 - **`.forgejo/workflows/dispatch.yml`** is the dependency take-up, through

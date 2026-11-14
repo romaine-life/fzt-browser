@@ -25,7 +25,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Read organization modules from Forgejo
@@ -41,32 +40,35 @@ jobs:
           'GIT_CONFIG_KEY_1=http.https://forgejo.romaine.life/.extraheader',
           "GIT_CONFIG_VALUE_1=Authorization: Basic $auth" | Add-Content $env:GITHUB_ENV
 
-      - name: Choose release version
+      # The commit's v0.1.N if it has one, else the next number, reserved on it.
+      - name: Number the release
         id: version
+        uses: romaine-life/pipeline-templates/actions/release-version@main
+        with:
+          prefix: v0.1
+          publish: 'true'
+
+      - name: Is the release complete
+        id: release
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          $sha = git rev-parse HEAD
-          $tag = git tag --points-at HEAD -l 'v0.1.*' --sort=-v:refname | Select-Object -First 1
-          if (-not $tag) {
-            $last = git tag -l 'v0.1.*' --sort=-v:refname | Select-Object -First 1
-            $tag = if ($last) { 'v0.1.' + ([int]$last.Split('.')[2] + 1) } else { 'v0.1.0' }
-          }
           $api = "$env:GITHUB_SERVER_URL/api/v1/repos/$env:GITHUB_REPOSITORY"
-          $release = Invoke-RestMethod "$api/releases/tags/$tag" -Headers @{Authorization="token $env:TOKEN"} -SkipHttpErrorCheck -StatusCodeVariable code
+          $release = Invoke-RestMethod "$api/releases/tags/$env:TAG" -Headers @{Authorization="token $env:TOKEN"} -SkipHttpErrorCheck -StatusCodeVariable code
           if ($code -notin 200,404) { throw "Release lookup returned $code" }
           $expected = 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js'
           $complete = $code -eq 200 -and -not $release.draft -and @($expected | Where-Object { $_ -notin $release.assets.name }).Count -eq 0
-          "tag=$tag", "sha=$sha", "skip=$($complete.ToString().ToLowerInvariant())" | Add-Content $env:GITHUB_OUTPUT
-          Write-Host "Release $tag at $sha (already complete: $complete)"
+          "skip=$($complete.ToString().ToLowerInvariant())" | Add-Content $env:GITHUB_OUTPUT
+          Write-Host "Release $env:TAG at $env:GITHUB_SHA (already complete: $complete)"
 
       - uses: romaine-life/pipeline-templates/actions/setup-go@main
-        if: steps.version.outputs.skip != 'true'
+        if: steps.release.outputs.skip != 'true'
         with:
           go-version-file: go.mod
 
       - name: Vet and build WASM
-        if: steps.version.outputs.skip != 'true'
+        if: steps.release.outputs.skip != 'true'
         env:
           GOOS: js
           GOARCH: wasm
@@ -84,18 +86,14 @@ jobs:
           }
 
       - name: Publish release and five assets
-        if: steps.version.outputs.skip != 'true'
+        if: steps.release.outputs.skip != 'true'
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
-          SHA: ${{ steps.version.outputs.sha }}
+          SHA: ${{ github.sha }}
         run: |
           $api = "$env:GITHUB_SERVER_URL/api/v1/repos/$env:GITHUB_REPOSITORY"
           $h = @{Authorization="token $env:TOKEN"}
-          $tag = Invoke-RestMethod "$api/tags/$env:TAG" -Headers $h -SkipHttpErrorCheck -StatusCodeVariable code
-          if ($code -eq 404) {
-            Invoke-RestMethod -Method Post "$api/tags" -Headers $h -ContentType application/json -Body (@{tag_name=$env:TAG;target=$env:SHA} | ConvertTo-Json) | Out-Null
-          } elseif ($code -ne 200 -or $tag.commit.sha -ne $env:SHA) { throw 'Release tag points to another commit' }
           $release = Invoke-RestMethod "$api/releases/tags/$env:TAG" -Headers $h -SkipHttpErrorCheck -StatusCodeVariable code
           if ($code -eq 404) {
             $body = @{tag_name=$env:TAG;target_commitish=$env:SHA;name=$env:TAG;body="Browser WASM release. $(git log --oneline -1)";draft=$true} | ConvertTo-Json
@@ -120,5 +118,5 @@ jobs:
           if ($published.draft -or $tag.commit.sha -ne $env:SHA -or @($expected | Where-Object { $_ -notin $published.assets.name }).Count) { throw 'Release verification failed' }
           Write-Host "$($published.html_url) at $env:SHA with all five assets"
       - name: Delete the files of older releases
-        if: steps.version.outputs.skip != 'true'
+        if: steps.release.outputs.skip != 'true'
         uses: romaine-life/pipeline-templates/actions/prune-releases@main
