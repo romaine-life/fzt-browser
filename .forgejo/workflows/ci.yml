@@ -76,7 +76,7 @@ jobs:
           'GIT_CONFIG_KEY_1=http.https://forgejo.romaine.life/.extraheader',
           "GIT_CONFIG_VALUE_1=Authorization: Basic $auth" | Add-Content $env:GITHUB_ENV
 
-      - uses: actions/setup-go@v6
+      - uses: romaine-life/pipeline-templates/actions/setup-go@main
         with:
           go-version-file: go.mod
 
