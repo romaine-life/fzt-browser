@@ -60,7 +60,7 @@ jobs:
           "tag=$tag", "sha=$sha", "skip=$($complete.ToString().ToLowerInvariant())" | Add-Content $env:GITHUB_OUTPUT
           Write-Host "Release $tag at $sha (already complete: $complete)"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         if: steps.version.outputs.skip != 'true'
         with:
           go-version-file: go.mod
