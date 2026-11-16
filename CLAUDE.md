@@ -9,6 +9,7 @@ Browser renderer for fzt. Compiles the Go engine to WASM and bundles the JavaScr
 - `fzt-web.js` — Higher-level wrapper with Catppuccin Mocha defaults (palette, Perfect DOS VGA 437 font, Nerd Font icons). Factory: `createFztWeb(container, options)`.
 - `fzt-dom-renderer.js` — Alternative DOM renderer using structured data API (`getVisibleRows`, `getPromptState`, `getUIState`) instead of ANSI parsing. Renders native DOM elements with CSS classes.
 - `fzt-terminal.css` — CRT terminal styles: scanline overlay, vignette, cursor blink, custom properties (`--fzt-*`).
+- `PerfectDOSVGA437.ttf`, `SymbolsNerdFontMono-Regular.ttf` — the text and icon fonts `fzt-web.js` names; `fzt-terminal.css` declares them by these relative paths, so a page serving the release assets from one folder gets them.
 - `wasm_exec.js` — Go's WASM runtime (the `Go` global), released from the toolchain that built `fzt.wasm` so a page always loads the matching one. Not checked in; the build copies it from `go env GOROOT`.
 
 ## WASM API
@@ -45,13 +46,13 @@ a job-scoped Git URL rewrite and `PIPELINE_DISPATCH_TOKEN`.
   `changes` job checks CI fetches and skips the build on a pull request that changes
   only documentation; `build` vets and builds WASM with the pinned engine version,
   stamped with the number release.yml would give it (`v0.1.N-prP.R`,
-  from pipeline-templates' `release-version`), and checks that the six release
+  from pipeline-templates' `release-version`), and checks that the eight release
   assets are present. A manual run with a
   `tag` input can resume uploading an incomplete release; existing assets must match
   the build byte for byte.
 - **`.forgejo/workflows/release.yml`** is manual. pipeline-templates' `release-version`
   reserves the next `v0.1.N` tag at the checked-out commit (one it already has is
-  kept), then it builds, stages all six assets on a draft release, and publishes
+  kept), then it builds, stages all eight assets on a draft release, and publishes
   only when they are present. Re-running an already complete HEAD
   release does nothing. It runs inline because Forgejo's reusable workflow lookup
   cannot resolve the private organization reliably.
@@ -65,7 +66,8 @@ Run a workflow with an authenticated POST to
 `https://forgejo.romaine.life/api/v1/repos/romaine-life/fzt-browser/actions/workflows/release.yml/dispatches`
 with JSON body `{"ref":"main"}`.
 The release assets are `fzt.wasm`, `fzt-terminal.js`, `fzt-terminal.css`,
-`fzt-web.js`, `fzt-dom-renderer.js`, and `wasm_exec.js`.
+`fzt-web.js`, `fzt-dom-renderer.js`, `wasm_exec.js`, `PerfectDOSVGA437.ttf`, and
+`SymbolsNerdFontMono-Regular.ttf`.
 
 Downstream consumers (`fzt-showcase`, `my-homepage`) download the release assets at
 deploy time and are updated manually; there is no dispatch fan-out. The GitHub

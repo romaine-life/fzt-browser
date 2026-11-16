@@ -1,10 +1,22 @@
 /* fzt-terminal.css — Shared CRT terminal styles for fzt WASM consumers.
    Override --fzt-* custom properties in your own stylesheet. */
 
+/* The fonts fzt-web.js names, released beside this file. */
+@font-face {
+  font-family: "Perfect DOS VGA 437";
+  src: url("PerfectDOSVGA437.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Symbols Nerd Font Mono";
+  src: url("SymbolsNerdFontMono-Regular.ttf") format("truetype");
+}
+
 :root {
   --fzt-bg: #0a0a0a;
   --fzt-fg: #c0caf5;
-  --fzt-font: monospace;
+  /* fzt-web.js measures cells in this font, so the grid lines up. */
+  --fzt-font: "Perfect DOS VGA 437", "Cascadia Code", "Fira Code", "JetBrains Mono", "Consolas", "Symbols Nerd Font Mono", monospace;
   --fzt-font-size: 16px;
   --fzt-border-radius: 12px / 14px;
   --fzt-outer-shadow: 0 0 30px rgba(0, 0, 0, 0.6);

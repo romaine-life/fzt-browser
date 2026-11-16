@@ -1,6 +1,6 @@
 name: CI
 
-# Every PR and main commit builds the same six assets as a release; a PR that
+# Every PR and main commit builds the same eight assets as a release; a PR that
 # changes only documentation skips the build. A manual run with a tag resumes an
 # incomplete release and never replaces assets; a manual run without one builds
 # the dispatched ref.
@@ -103,7 +103,7 @@ jobs:
           go build -trimpath -ldflags "-X github.com/romaine-life/fzt/render.Version=$env:VERSION -X github.com/romaine-life/fzt-frontend.EngineVersion=$engine" -o fzt.wasm .
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           Copy-Item (Join-Path (go env GOROOT) lib/wasm/wasm_exec.js) wasm_exec.js
-          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js','wasm_exec.js') {
+          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js','wasm_exec.js','PerfectDOSVGA437.ttf','SymbolsNerdFontMono-Regular.ttf') {
             if ((Get-Item $file).Length -eq 0) { throw "Empty release asset: $file" }
           }
 
@@ -119,7 +119,7 @@ jobs:
           $tag = Invoke-RestMethod "$api/tags/$env:TAG" -Headers $h
           if ($tag.commit.sha -ne $sha) { throw 'Release tag points to another commit' }
           $release = Invoke-RestMethod "$api/releases/tags/$env:TAG" -Headers $h
-          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js','wasm_exec.js') {
+          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js','wasm_exec.js','PerfectDOSVGA437.ttf','SymbolsNerdFontMono-Regular.ttf') {
             $existing = $release.assets | Where-Object name -eq $file
             if ($existing) {
               $saved = Join-Path $env:RUNNER_TEMP ([Guid]::NewGuid().ToString())
@@ -134,7 +134,7 @@ jobs:
           if ($release.draft) {
             Invoke-RestMethod -Method Patch "$api/releases/$($release.id)" -Headers $h -ContentType application/json -Body '{"draft":false}' | Out-Null
           }
-          Write-Host "Published all six assets for $env:TAG at $sha"
+          Write-Host "Published all eight assets for $env:TAG at $sha"
       - name: Delete the files of older releases
         if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
         uses: romaine-life/pipeline-templates/actions/prune-releases@main
