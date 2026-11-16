@@ -57,7 +57,7 @@ jobs:
           $api = "$env:GITHUB_SERVER_URL/api/v1/repos/$env:GITHUB_REPOSITORY"
           $release = Invoke-RestMethod "$api/releases/tags/$env:TAG" -Headers @{Authorization="token $env:TOKEN"} -SkipHttpErrorCheck -StatusCodeVariable code
           if ($code -notin 200,404) { throw "Release lookup returned $code" }
-          $expected = 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js'
+          $expected = 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js','wasm_exec.js'
           $complete = $code -eq 200 -and -not $release.draft -and @($expected | Where-Object { $_ -notin $release.assets.name }).Count -eq 0
           "skip=$($complete.ToString().ToLowerInvariant())" | Add-Content $env:GITHUB_OUTPUT
           Write-Host "Release $env:TAG at $env:GITHUB_SHA (already complete: $complete)"
@@ -81,11 +81,12 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           go build -trimpath -ldflags "-X github.com/romaine-life/fzt/render.Version=$env:TAG -X github.com/romaine-life/fzt-frontend.EngineVersion=$engine" -o fzt.wasm .
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js') {
+          Copy-Item (Join-Path (go env GOROOT) lib/wasm/wasm_exec.js) wasm_exec.js
+          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js','wasm_exec.js') {
             if ((Get-Item $file).Length -eq 0) { throw "Empty release asset: $file" }
           }
 
-      - name: Publish release and five assets
+      - name: Publish release and six assets
         if: steps.release.outputs.skip != 'true'
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,7 +100,7 @@ jobs:
             $body = @{tag_name=$env:TAG;target_commitish=$env:SHA;name=$env:TAG;body="Browser WASM release. $(git log --oneline -1)";draft=$true} | ConvertTo-Json
             $release = Invoke-RestMethod -Method Post "$api/releases" -Headers $h -ContentType application/json -Body $body
           } elseif ($code -ne 200) { throw "Release lookup returned $code" }
-          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js') {
+          foreach ($file in 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js','wasm_exec.js') {
             $existing = $release.assets | Where-Object name -eq $file
             if ($existing) {
               $saved = Join-Path $env:RUNNER_TEMP ([Guid]::NewGuid().ToString())
@@ -114,9 +115,9 @@ jobs:
           Invoke-RestMethod -Method Patch "$api/releases/$($release.id)" -Headers $h -ContentType application/json -Body '{"draft":false}' | Out-Null
           $published = Invoke-RestMethod "$api/releases/tags/$env:TAG" -Headers $h
           $tag = Invoke-RestMethod "$api/tags/$env:TAG" -Headers $h
-          $expected = 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js'
+          $expected = 'fzt.wasm','fzt-terminal.js','fzt-terminal.css','fzt-web.js','fzt-dom-renderer.js','wasm_exec.js'
           if ($published.draft -or $tag.commit.sha -ne $env:SHA -or @($expected | Where-Object { $_ -notin $published.assets.name }).Count) { throw 'Release verification failed' }
-          Write-Host "$($published.html_url) at $env:SHA with all five assets"
+          Write-Host "$($published.html_url) at $env:SHA with all six assets"
       - name: Delete the files of older releases
         if: steps.release.outputs.skip != 'true'
         uses: romaine-life/pipeline-templates/actions/prune-releases@main
