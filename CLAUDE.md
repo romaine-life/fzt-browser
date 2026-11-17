@@ -4,13 +4,15 @@ Browser renderer for fzt. Compiles the Go engine to WASM and bundles the JavaScr
 
 ## Contents
 
-- `main.go` — Go-side WASM entry point (`//go:build js && wasm`). Imports `fzt/core` and `fzt-terminal/tui` for headless session rendering. Exposes a `fzt` global on window.
+- `main.go` — Go-side WASM entry point (`//go:build js && wasm`); `version.go` hands the release the suite stamps into `main.version` to `render.Version`. Imports `fzt/core` and `fzt-terminal/tui` for headless session rendering. Exposes a `fzt` global on window.
+The JavaScript, CSS and fonts live in `release/assets/go/`, which the release suite copies into every release beside the WASM:
+
 - `fzt-terminal.js` — Core browser terminal: ANSI parser, grid renderer (styled HTML spans), font metrics, keyboard forwarding, resize observer. Factory: `createFztTerminal(container, options)`.
 - `fzt-web.js` — Higher-level wrapper with Catppuccin Mocha defaults (palette, Perfect DOS VGA 437 font, Nerd Font icons). Factory: `createFztWeb(container, options)`.
 - `fzt-dom-renderer.js` — Alternative DOM renderer using structured data API (`getVisibleRows`, `getPromptState`, `getUIState`) instead of ANSI parsing. Renders native DOM elements with CSS classes.
 - `fzt-terminal.css` — CRT terminal styles: scanline overlay, vignette, cursor blink, custom properties (`--fzt-*`).
 - `PerfectDOSVGA437.ttf`, `SymbolsNerdFontMono-Regular.ttf` — the text and icon fonts `fzt-web.js` names; `fzt-terminal.css` declares them by these relative paths, so a page serving the release assets from one folder gets them.
-- `wasm_exec.js` — Go's WASM runtime (the `Go` global), released from the toolchain that built `fzt.wasm` so a page always loads the matching one. Not checked in; the build copies it from `go env GOROOT`.
+- `wasm_exec.js` — Go's WASM runtime (the `Go` global), released from the toolchain that built `fzt.wasm` so a page always loads the matching one. Not checked in; the release suite copies it from `go env GOROOT` for every js/wasm build.
 
 ## WASM API
 
@@ -38,36 +40,22 @@ The Go code exposes a global `fzt` object:
 
 ## CI
 
-Forgejo is the home for checks, dependency updates and releases. Go module paths
-remain `github.com/romaine-life/...`; each job reads their source from Forgejo with
-a job-scoped Git URL rewrite and `PIPELINE_DISPATCH_TOKEN`.
+Forgejo is the home for checks, dependency updates and releases. The repo keeps no
+workflows of its own: its CI is pipeline-templates' `go` and `release` suites, set by
+its entry in pipeline-templates' `fleet.json` (PIPT-12).
 
-- **`.forgejo/workflows/ci.yml`** runs on every pull request and main push. Its
-  `changes` job checks CI fetches and skips the build on a pull request that changes
-  only documentation; `build` vets and builds WASM with the pinned engine version,
-  stamped with the number release.yml would give it (`v0.1.N-prP.R`,
-  from pipeline-templates' `release-version`), and checks that the eight release
-  assets are present. A manual run with a
-  `tag` input can resume uploading an incomplete release; existing assets must match
-  the build byte for byte.
-- **`.forgejo/workflows/release.yml`** is manual. pipeline-templates' `release-version`
-  reserves the next `v0.1.N` tag at the checked-out commit (one it already has is
-  kept), then it builds, stages all eight assets on a draft release, and publishes
-  only when they are present. Re-running an already complete HEAD
-  release does nothing. It runs inline because Forgejo's reusable workflow lookup
-  cannot resolve the private organization reliably.
-- **`.forgejo/workflows/dispatch.yml`** is the dependency take-up, through
-  pipeline-templates' take-up template. strip-owner starts it when it delivers a
-  change to `fzt` or `fzt-terminal`: it opens a PR taking them at their latest and
-  has Forgejo merge it once CI passes, and strip-owner starts Release once it has
-  (PIPT-3). It never pushes directly to main.
+- **Pull requests:** gofmt, and `go vet` with `GOOS=js GOARCH=wasm` (the only
+  platform this code builds for).
+- **Merges:** each merge that changes the code or `release/assets/go/` releases the
+  next `v0.1.N`: `fzt.wasm`, the toolchain's `wasm_exec.js` and the six files in
+  `release/assets/go/`.
+- **Take-ups:** `fleet.json` names `github.com/romaine-life/fzt` and
+  `github.com/romaine-life/fzt-terminal` as its `go.dependencies`; strip-owner starts
+  the Go suite's take-up when it delivers a change to either.
 
-Run a workflow with an authenticated POST to
-`https://forgejo.romaine.life/api/v1/repos/romaine-life/fzt-browser/actions/workflows/release.yml/dispatches`
-with JSON body `{"ref":"main"}`.
-The release assets are `fzt.wasm`, `fzt-terminal.js`, `fzt-terminal.css`,
-`fzt-web.js`, `fzt-dom-renderer.js`, `wasm_exec.js`, `PerfectDOSVGA437.ttf`, and
-`SymbolsNerdFontMono-Regular.ttf`.
+Run `ci-check` before a push. The release assets are `fzt.wasm`, `fzt-terminal.js`,
+`fzt-terminal.css`, `fzt-web.js`, `fzt-dom-renderer.js`, `wasm_exec.js`,
+`PerfectDOSVGA437.ttf`, and `SymbolsNerdFontMono-Regular.ttf`.
 
 Downstream consumers (`fzt-showcase`, `my-homepage`) download the release assets at
 deploy time and are updated manually; there is no dispatch fan-out. The GitHub
