@@ -25,7 +25,7 @@ The Go code exposes a global `fzt` object:
 - `fzt.setStatus(msg, style)` — write to the title bar status area. `style` maps to `core.State.TitleStyle` (0=default cyan, 1=green success, 2=red error, 3=neutral slate). Requires an active session; returns a frame for immediate render.
 - `fzt.clearStatus()` — remove the title override, restoring the default title.
 - `fzt.init(cols, rows)` — create session, returns `{ansi, cursorX, cursorY}`
-- `fzt.handleKey(key, ctrl, shift)` — process keyboard event, returns frame + action. The `ctrl` bool is accepted but ignored — the ecosystem retired Ctrl bindings entirely (my-homepage#24); any Ctrl+letter is a silent no-op. Kept in the signature so JS callers don't break; can be dropped whenever downstream consumers update.
+- `fzt.handleKey(key, ctrl, shift)` — process keyboard event, returns frame + action. With `ctrl`, `c` becomes Ctrl+C, which fzt treats as quit from any depth (the host gets `cancel`, as for Escape at the top; FZT2-7); every other Ctrl+letter is a silent no-op, the rest of the Ctrl bindings retired by my-homepage#24.
 - `fzt.clickRow(row)` — process mouse click on visual row
 - `fzt.resize(cols, rows)` — resize terminal
 - `fzt.getVisibleRows()` / `fzt.getPromptState()` / `fzt.getUIState()` — structured data API for the DOM renderer

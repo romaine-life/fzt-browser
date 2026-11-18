@@ -373,11 +373,14 @@ func translateKey(key string, ctrl, shift bool) (tcell.Key, rune) {
 	// Single character keys
 	if len(key) == 1 {
 		r := rune(key[0])
-		// Ecosystem-wide policy: no Ctrl bindings anywhere. Any Ctrl+letter
-		// combo is a silent no-op (returning KeyRune with ch=0 means "nothing
-		// to insert"). Shift is Shift and passes through as the literal
-		// character (the browser already folds it into the key string).
+		// Ctrl+C is fzt's one Ctrl binding: quit from any depth (FZT2-7).
+		// Any other Ctrl+letter is a silent no-op (KeyRune with ch=0 means
+		// "nothing to insert"). Shift is Shift and passes through as the
+		// literal character (the browser already folds it into the key string).
 		if ctrl {
+			if r == 'c' || r == 'C' {
+				return tcell.KeyCtrlC, 0
+			}
 			return tcell.KeyRune, 0
 		}
 		return tcell.KeyRune, r
