@@ -1,0 +1,12 @@
+{
+  "name": "@romaine-life/fzt-browser",
+  "version": "0.0.0-development",
+  "description": "fzt in a browser: fzt.wasm, Go's wasm_exec.js, and the JavaScript, CSS and fonts that run it, as each release ships them in dist/.",
+  "repository": {
+    "type": "git",
+    "url": "https://forgejo.romaine.life/romaine-life/fzt-browser.git"
+  },
+  "files": [
+    "dist"
+  ]
+}

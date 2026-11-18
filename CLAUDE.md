@@ -57,9 +57,11 @@ Run `ci-check` before a push. The release assets are `fzt.wasm`, `fzt-terminal.j
 `fzt-terminal.css`, `fzt-web.js`, `fzt-dom-renderer.js`, `wasm_exec.js`,
 `PerfectDOSVGA437.ttf`, and `SymbolsNerdFontMono-Regular.ttf`.
 
-Downstream consumers (`fzt-showcase`, `my-homepage`) download the release assets at
-deploy time and are updated manually; there is no dispatch fan-out. The GitHub
-workflows remain enabled during migration until Forgejo's main CI and release pass.
+Each release also publishes the npm package `@romaine-life/fzt-browser` to Forgejo's
+registry at the release's version: `package.json` lists `dist`, which holds the release
+assets. Repositories that use it (landing-page, my-homepage, fzt-desktop) list it in their
+own `package.json`, and each release proposes it to them as a take-up PR (pipeline-templates
+`suites/README.md`, npm packages on Forgejo; PIPT-32).
 
 ## History
 
